@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -114,9 +114,9 @@ vim.opt.showmode = false
 --  Schedule the setting after `UiEnter` because it can increase startup-time.
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
-vim.schedule(function()
-  vim.opt.clipboard = 'unnamedplus'
-end)
+-- vim.schedule(function()
+--   vim.opt.clipboard = 'unnamedplus'
+-- end)
 
 -- Enable break indent
 vim.opt.breakindent = true
@@ -214,6 +214,58 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+-- NOTE: utility functions
+
+local root_markers = { '.git', 'Makefile' }
+local exrcs = { '.nvim.lua', '.nvimrc', '.exrc' }
+
+-- If there's an exrc file that's trusted at the given path,
+-- source it, otherwise return
+local read_exrc = function(path)
+  if vim.o.exrc == false then
+    return
+  end
+
+  -- stops on first found, returns table so we index it to get string
+  local exrc = vim.fs.find(exrcs, {
+    path = path,
+    type = 'file',
+  })[1] -- string|nil
+  if not exrc then
+    return
+  end
+
+  if vim.secure.read(exrc) then
+    vim.cmd.source(exrc)
+  end
+end
+
+-- Return directory path to start search from
+local set_project_root = function()
+  local cwd = vim.fn.getcwd()
+
+  local root_marker = vim.fs.find(root_markers, {
+    path = cwd,
+    upward = true,
+  })[1]
+
+  if not root_marker then
+    return
+  end
+
+  -- otherwise you get root_dir as '/foo/bar/.git', '/foo/bar'
+  local root_dir = vim.fs.dirname(root_marker)
+
+  vim.fn.chdir(root_dir)
+  read_exrc(root_dir)
+end
+
+vim.api.nvim_create_autocmd('BufEnter', {
+  group = vim.api.nvim_create_augroup('Rooter', {}),
+  desc = 'Find project root on BufEnter. cd there and try reading any exrc there.',
+  callback = set_project_root,
+})
+
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
@@ -275,7 +327,11 @@ require('lazy').setup({
       },
     },
   },
-
+  {
+    'pmizio/typescript-tools.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    opts = {},
+  },
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
   -- This is often very useful to both group configuration, as well as handle
@@ -476,7 +532,30 @@ require('lazy').setup({
       -- NOTE: `opts = {}` is the same as calling `require('mason').setup({})`
       { 'williamboman/mason.nvim', opts = {} },
       'williamboman/mason-lspconfig.nvim',
-      'WhoIsSethDaniel/mason-tool-installer.nvim',
+      {
+        'WhoIsSethDaniel/mason-tool-installer.nvim',
+        dependencies = {
+          {
+            'Nydauron/mason-sync.nvim',
+            dependencies = { 'nvim-lua/plenary.nvim' },
+            opts = {
+              -- A relative file path pointing to where mason-sync should write all installed Mason servers.
+              -- This will be joined with respect to root_dir.
+              file = 'servers.json',
+              -- Root directory where file will reside.
+              root_dir = vim.fn.stdpath 'config',
+              sync_on_mason_change = {
+                -- After each sucessful Mason install, mason-sync will sync the current list of plugins to
+                -- the file specified
+                on_install = true,
+                -- After each sucessful Mason uninstall, mason-sync will sync the current list of plugins
+                -- to the file specified
+                on_uninstall = true,
+              },
+            },
+          },
+        },
+      },
 
       -- Useful status updates for LSP.
       { 'j-hui/fidget.nvim', opts = {} },
@@ -708,6 +787,7 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        require('mason-sync').ensure_installed_servers(),
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -764,9 +844,56 @@ require('lazy').setup({
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { 'prettierd', 'prettier', stop_after_first = true },
+        typescript = { 'prettierd', 'prettier', stop_after_first = true },
+        javascriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+        typescriptreact = { 'prettierd', 'prettier', stop_after_first = true },
       },
     },
+  },
+
+  {
+    'mfussenegger/nvim-lint',
+    event = {
+      'BufReadPre',
+      'BufNewFile',
+    },
+    config = function()
+      local lint = require 'lint'
+
+      lint.linters_by_ft = {
+        javascript = { 'eslint_d' },
+        typescript = { 'eslint_d' },
+        javascriptreact = { 'eslint_d' },
+        typescriptreact = { 'eslint_d' },
+      }
+
+      local lint_augroup = vim.api.nvim_create_augroup('lint', { clear = true })
+
+      vim.api.nvim_create_autocmd({ 'BufEnter', 'BufWritePost', 'InsertLeave' }, {
+        group = lint_augroup,
+        callback = function()
+          lint.try_lint()
+        end,
+      })
+      vim.keymap.set('n', '<leader>l', function()
+        lint.try_lint()
+      end, { desc = 'Trigger [l]inting for current file' })
+    end,
+  },
+
+  {
+    'zbirenbaum/neodim',
+    event = 'LspAttach',
+    config = function()
+      require('neodim').setup {
+        hide = {
+          signs = false,
+          virtual_text = false,
+          underline = false,
+        },
+      }
+    end,
   },
 
   { -- Autocompletion
@@ -868,6 +995,105 @@ require('lazy').setup({
     },
   },
 
+  -- Debugging
+  {
+    'mfussenegger/nvim-dap',
+  },
+  {
+    'rcarriga/nvim-dap-ui',
+    dependencies = { 'mfussenegger/nvim-dap', 'nvim-neotest/nvim-nio' },
+    config = function()
+      local dap = require 'dap'
+      local utils = require 'dap.utils'
+      local dapui = require 'dapui'
+      dap.adapters = {
+        ['pwa-node'] = {
+          type = 'server',
+          port = '${port}',
+          executable = {
+            command = 'js-debug-adapter',
+            args = {
+              '${port}',
+            },
+          },
+        },
+      }
+
+      dap.configurations['typescript'] = {
+        {
+          type = 'pwa-node',
+          request = 'launch',
+          name = 'Launch file',
+          program = '${file}',
+          cwd = '${workspaceFolder}',
+        },
+        {
+          type = 'pwa-node',
+          request = 'attach',
+          name = 'Attach to process ID',
+          processId = utils.pick_process,
+          cwd = '${workspaceFolder}',
+        },
+      }
+      dap.listeners.after.event_initialized['dapui_config'] = dapui.open
+      dap.listeners.before.event_terminated['dapui_config'] = dapui.close
+      dap.listeners.before.event_exited['dapui_config'] = dapui.close
+
+      local map = function(keys, func, desc)
+        if desc then
+          desc = '[D]ebugger: ' .. desc
+        end
+        if keys then
+          keys = '<leader>d' .. keys
+        end
+        vim.keymap.set('n', keys, func, { desc = desc })
+      end
+
+      map('c', dap.continue, '[C]ontinue')
+      -- TODO: is this really needed?
+      -- map("a", function()
+      --   require("dap").continue({ before = get_args })
+      -- end, "Run with [A]rgs")
+      map('i', dap.step_into, 'Step [I]nto')
+      map('O', dap.step_out, 'Step [O]ut')
+      map('o', dap.step_over, 'Step Over')
+      map('C', function()
+        require('dap').run_to_cursor()
+      end, 'Run to [C]ursor')
+      map('g', function()
+        require('dap').goto_()
+      end, '[G]o to line (no execute)')
+      map('b', dap.toggle_breakpoint, 'Toggle [B]reakpoint')
+      map('B', function()
+        dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
+      end, 'Set [B]reakpoint')
+      map('j', dap.down, 'Down')
+      map('k', dap.up, 'Up')
+      map('l', dap.run_last, 'Run [L]ast')
+      map('p', dap.pause, 'Pause')
+      map('r', function()
+        dap.repl.toggle()
+      end, 'Toggle REPL')
+      map('s', dap.session, 'Session')
+      map('t', dap.terminate, 'Terminate')
+      map('w', function()
+        require('dap.ui.widgets').hover()
+      end, 'Widgets')
+
+      map('u', function()
+        dapui.toggle {
+          -- Always open the nvim dap ui in the default sizes
+          reset = true,
+        }
+      end, 'Toggle [U]I')
+      map('e', function()
+        dapui.eval()
+      end, 'Eval')
+
+      vim.api.nvim_set_keymap('n', '<F5>', [[:lua require"osv".launch({port = 8086})<CR>]], { noremap = true })
+    end,
+  },
+
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
     -- change the command in the config to whatever the name of that colorscheme is.
@@ -926,8 +1152,59 @@ require('lazy').setup({
         return '%2l:%-2v'
       end
 
+      require('mini.files').setup {}
+      local mini_files = require 'mini.files'
+      vim.keymap.set('n', '<leader>e', mini_files.open, { desc = '[E]xplore files in project' })
+      vim.keymap.set('n', '<leader>E', function()
+        local parent_directory = vim.fn.expand '%:p:h'
+        mini_files.open(parent_directory or vim.fn.expand ':cd')
+      end, { desc = '[E]xplore files in project' })
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
+    end,
+  },
+  {
+    'ThePrimeagen/harpoon',
+    branch = 'harpoon2',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    config = function()
+      local harpoon = require 'harpoon'
+
+      -- REQUIRED
+      harpoon:setup {
+        settings = {
+          sync_on_ui_close = true,
+        },
+      }
+      -- REQUIRED
+
+      vim.keymap.set('n', '<leader><C-a>', function()
+        harpoon:list():add()
+      end, { desc = 'Harpoon [A]dd file' })
+      vim.keymap.set('n', '<leader><C-h>', function()
+        harpoon.ui:toggle_quick_menu(harpoon:list())
+      end, { desc = '[H]arpoon menu open' })
+
+      vim.keymap.set('n', '<C-1>', function()
+        harpoon:list():select(1)
+      end, { desc = 'Go to Harpoon file [1]' })
+      vim.keymap.set('n', '<C-2>', function()
+        harpoon:list():select(2)
+      end, { desc = 'Go to Harpoon file [2]' })
+      vim.keymap.set('n', '<C-3>', function()
+        harpoon:list():select(3)
+      end, { desc = 'Go to Harpoon file [3]' })
+      vim.keymap.set('n', '<C-4>', function()
+        harpoon:list():select(4)
+      end, { desc = 'Go to Harpoon file [4]' })
+
+      -- Toggle previous & next buffers stored within Harpoon list
+      vim.keymap.set('n', '<s-tab>', function()
+        harpoon:list():prev { ui_nav_wrap = true }
+      end, { desc = 'Go to previous file' })
+      vim.keymap.set('n', '<tab>', function()
+        harpoon:list():next { ui_nav_wrap = true }
+      end, { desc = 'Go to next file' })
     end,
   },
   { -- Highlight, edit, and navigate code
@@ -967,7 +1244,7 @@ require('lazy').setup({
   --
   -- require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
   require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
