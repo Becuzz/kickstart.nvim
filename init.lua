@@ -203,10 +203,48 @@ vim.keymap.set('x', '<C-p>', '"_dP', { desc = 'Paste and keep' })
 vim.keymap.set('v', 'J', ":m '>+1<CR>gv=gv", { desc = 'Move block down' })
 vim.keymap.set('v', 'K', ":m '<-2<CR>gv=gv", { desc = 'Move block up' })
 
-vim.keymap.set('n', 'ge', '<cmd>cnext<CR>zz', { desc = '' })
-vim.keymap.set('n', 'gp', '<cmd>cprev<CR>zz', { desc = '' })
-vim.keymap.set('n', 'gj', '<cmd>lnext<CR>zz', { desc = '' })
-vim.keymap.set('n', 'gk', '<cmd>lprev<CR>zz', { desc = '' })
+vim.keymap.set('n', 'ge', function()
+  local error_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR, wrap = true })
+  if #error_count > 0 then
+    vim.diagnostic.goto_next { severity = vim.diagnostic.severity.ERROR, wrap = true }
+  else
+    local warn_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN, wrap = true })
+    if #warn_count > 0 then
+      vim.diagnostic.goto_next { severity = vim.diagnostic.severity.WARN, wrap = true }
+    else
+      local info_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO, wrap = true })
+      if #info_count > 0 then
+        vim.diagnostic.goto_next { severity = vim.diagnostic.severity.INFO, wrap = true }
+      else
+        local hint_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.HINT, wrap = true })
+        if #hint_count > 0 then
+          vim.diagnostic.goto_next { severity = vim.diagnostic.severity.HINT, wrap = true }
+        end
+      end
+    end
+  end
+end, { desc = 'Jump to next error' })
+vim.keymap.set('n', 'gp', function()
+  local error_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR, wrap = true })
+  if #error_count > 0 then
+    vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.ERROR, wrap = true }
+  else
+    local warn_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN, wrap = true })
+    if #warn_count > 0 then
+      vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.WARN, wrap = true }
+    else
+      local info_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO, wrap = true })
+      if #info_count > 0 then
+        vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.INFO, wrap = true }
+      else
+        local hint_count = vim.diagnostic.get(0, { severity = vim.diagnostic.severity.HINT, wrap = true })
+        if #hint_count > 0 then
+          vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.HINT, wrap = true }
+        end
+      end
+    end
+  end
+end, { desc = '' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -1023,29 +1061,29 @@ require('lazy').setup({
   },
 
   -- Debugging
-  {
-    'mfussenegger/nvim-dap',
-  },
-  {
-    'jay-babu/mason-nvim-dap.nvim',
-    opts = {
-      -- This line is essential to making automatic installation work
-      -- :exploding-brain
-      handlers = {},
-      automatic_installation = {
-        -- These will be configured by separate plugins.
-        exclude = {},
-      },
-      -- DAP servers: Mason will be invoked to install these if necessary.
-      ensure_installed = {
-        'js-debug-adapter',
-      },
-    },
-    dependencies = {
-      'mfussenegger/nvim-dap',
-      'williamboman/mason.nvim',
-    },
-  },
+  -- {
+  --   'mfussenegger/nvim-dap',
+  -- },
+  -- {
+  --   'jay-babu/mason-nvim-dap.nvim',
+  --   opts = {
+  --     -- This line is essential to making automatic installation work
+  --     -- :exploding-brain
+  --     handlers = {},
+  --     automatic_installation = {
+  --       -- These will be configured by separate plugins.
+  --       exclude = {},
+  --     },
+  --     -- DAP servers: Mason will be invoked to install these if necessary.
+  --     ensure_installed = {
+  --       'js-debug-adapter',
+  --     },
+  --   },
+  --   dependencies = {
+  --     'mfussenegger/nvim-dap',
+  --     'williamboman/mason.nvim',
+  --   },
+  -- },
   {
     'theHamsta/nvim-dap-virtual-text',
     config = true,
@@ -1053,104 +1091,104 @@ require('lazy').setup({
       'mfussenegger/nvim-dap',
     },
   },
-  {
-    'rcarriga/nvim-dap-ui',
-    dependencies = {
-      'jay-babu/mason-nvim-dap.nvim',
-      'nvim-neotest/nvim-nio',
-      'theHamsta/nvim-dap-virtual-text',
-    },
-    config = function()
-      local dap = require 'dap'
-      local utils = require 'dap.utils'
-      local dapui = require 'dapui'
-      dap.adapters = {
-        ['pwa-node'] = {
-          type = 'server',
-          port = '${port}',
-          executable = {
-            command = 'js-debug-adapter',
-            args = {
-              '${port}',
-            },
-          },
-        },
-      }
-
-      dap.configurations['typescript'] = {
-        {
-          type = 'pwa-node',
-          request = 'launch',
-          name = 'Launch file',
-          program = '${file}',
-          cwd = '${workspaceFolder}',
-        },
-        {
-          type = 'pwa-node',
-          request = 'attach',
-          name = 'Attach to process ID',
-          processId = utils.pick_process,
-          cwd = '${workspaceFolder}',
-        },
-      }
-      dap.listeners.after.event_initialized['dapui_config'] = dapui.open
-      dap.listeners.before.event_terminated['dapui_config'] = dapui.close
-      dap.listeners.before.event_exited['dapui_config'] = dapui.close
-
-      local map = function(keys, func, desc)
-        if desc then
-          desc = '[D]ebugger: ' .. desc
-        end
-        if keys then
-          keys = '<leader>d' .. keys
-        end
-        vim.keymap.set('n', keys, func, { desc = desc })
-      end
-
-      map('c', dap.continue, '[C]ontinue')
-      -- TODO: is this really needed?
-      -- map("a", function()
-      --   require("dap").continue({ before = get_args })
-      -- end, "Run with [A]rgs")
-      map('i', dap.step_into, 'Step [I]nto')
-      map('O', dap.step_out, 'Step [O]ut')
-      map('o', dap.step_over, 'Step Over')
-      map('C', function()
-        require('dap').run_to_cursor()
-      end, 'Run to [C]ursor')
-      map('g', function()
-        require('dap').goto_()
-      end, '[G]o to line (no execute)')
-      map('b', dap.toggle_breakpoint, 'Toggle [B]reakpoint')
-      map('B', function()
-        dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
-      end, 'Set [B]reakpoint')
-      map('j', dap.down, 'Down')
-      map('k', dap.up, 'Up')
-      map('l', dap.run_last, 'Run [L]ast')
-      map('p', dap.pause, 'Pause')
-      map('r', function()
-        dap.repl.toggle()
-      end, 'Toggle REPL')
-      map('s', dap.session, 'Session')
-      map('t', dap.terminate, 'Terminate')
-      map('w', function()
-        require('dap.ui.widgets').hover()
-      end, 'Widgets')
-
-      map('u', function()
-        dapui.toggle {
-          -- Always open the nvim dap ui in the default sizes
-          reset = true,
-        }
-      end, 'Toggle [U]I')
-      map('e', function()
-        dapui.eval()
-      end, 'Eval')
-
-      vim.api.nvim_set_keymap('n', '<F5>', [[:lua require"osv".launch({port = 8086})<CR>]], { noremap = true })
-    end,
-  },
+  -- {
+  --   'rcarriga/nvim-dap-ui',
+  --   dependencies = {
+  --     'jay-babu/mason-nvim-dap.nvim',
+  --     'nvim-neotest/nvim-nio',
+  --     'theHamsta/nvim-dap-virtual-text',
+  --   },
+  --   config = function()
+  --     local dap = require 'dap'
+  --     local utils = require 'dap.utils'
+  --     local dapui = require 'dapui'
+  --     dap.adapters = {
+  --       ['pwa-node'] = {
+  --         type = 'server',
+  --         port = '${port}',
+  --         executable = {
+  --           command = 'js-debug-adapter',
+  --           args = {
+  --             '${port}',
+  --           },
+  --         },
+  --       },
+  --     }
+  --
+  --     dap.configurations['typescript'] = {
+  --       {
+  --         type = 'pwa-node',
+  --         request = 'launch',
+  --         name = 'Launch file',
+  --         program = '${file}',
+  --         cwd = '${workspaceFolder}',
+  --       },
+  --       {
+  --         type = 'pwa-node',
+  --         request = 'attach',
+  --         name = 'Attach to process ID',
+  --         processId = utils.pick_process,
+  --         cwd = '${workspaceFolder}',
+  --       },
+  --     }
+  --     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
+  --     dap.listeners.before.event_terminated['dapui_config'] = dapui.close
+  --     dap.listeners.before.event_exited['dapui_config'] = dapui.close
+  --
+  --     local map = function(keys, func, desc)
+  --       if desc then
+  --         desc = '[D]ebugger: ' .. desc
+  --       end
+  --       if keys then
+  --         keys = '<leader>d' .. keys
+  --       end
+  --       vim.keymap.set('n', keys, func, { desc = desc })
+  --     end
+  --
+  --     map('c', dap.continue, '[C]ontinue')
+  --     -- TODO: is this really needed?
+  --     -- map("a", function()
+  --     --   require("dap").continue({ before = get_args })
+  --     -- end, "Run with [A]rgs")
+  --     map('i', dap.step_into, 'Step [I]nto')
+  --     map('O', dap.step_out, 'Step [O]ut')
+  --     map('o', dap.step_over, 'Step Over')
+  --     map('C', function()
+  --       require('dap').run_to_cursor()
+  --     end, 'Run to [C]ursor')
+  --     map('g', function()
+  --       require('dap').goto_()
+  --     end, '[G]o to line (no execute)')
+  --     map('b', dap.toggle_breakpoint, 'Toggle [B]reakpoint')
+  --     map('B', function()
+  --       dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
+  --     end, 'Set [B]reakpoint')
+  --     map('j', dap.down, 'Down')
+  --     map('k', dap.up, 'Up')
+  --     map('l', dap.run_last, 'Run [L]ast')
+  --     map('p', dap.pause, 'Pause')
+  --     map('r', function()
+  --       dap.repl.toggle()
+  --     end, 'Toggle REPL')
+  --     map('s', dap.session, 'Session')
+  --     map('t', dap.terminate, 'Terminate')
+  --     map('w', function()
+  --       require('dap.ui.widgets').hover()
+  --     end, 'Widgets')
+  --
+  --     map('u', function()
+  --       dapui.toggle {
+  --         -- Always open the nvim dap ui in the default sizes
+  --         reset = true,
+  --       }
+  --     end, 'Toggle [U]I')
+  --     map('e', function()
+  --       dapui.eval()
+  --     end, 'Eval')
+  --
+  --     vim.api.nvim_set_keymap('n', '<F5>', [[:lua require"osv".launch({port = 8086})<CR>]], { noremap = true })
+  --   end,
+  -- },
 
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
@@ -1298,7 +1336,37 @@ require('lazy').setup({
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
   { 'nvim-treesitter/nvim-treesitter-context', dependencies = { 'nvim-treesitter/nvim-treesitter' } },
+  {
+    'lucaSartore/fastspell.nvim',
+    -- automatically run the installation script on windows and linux)
+    -- if this doesn't work for some reason, you can
+    build = function()
+      local base_path = vim.fn.stdpath 'data' .. '/lazy/fastspell.nvim'
+      local cmd = base_path .. '/lua/scripts/install.' .. (vim.fn.has 'win32' and 'cmd' or 'sh')
+      vim.system { cmd }
+    end,
 
+    config = function()
+      local fastspell = require 'fastspell'
+
+      -- call setup to initialize fastspell
+      fastspell.setup {
+        -- Optionally put your custom configurations here
+      }
+
+      -- decide when to run the spell checking (see :help events for full list)
+      vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI', 'BufEnter', 'WinScrolled' }, {
+        callback = function(_)
+          -- decide the area in your buffer that will be checked. This is the default configuration,
+          -- and look for spelling mistakes ONLY in the lines of the bugger that are currently displayed
+          -- for more advanced configurations see the section bellow
+          local first_line = vim.fn.line 'w0' - 1
+          local last_line = vim.fn.line 'w$'
+          fastspell.sendSpellCheckRequest(first_line, last_line)
+        end,
+      })
+    end,
+  },
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
@@ -1308,11 +1376,11 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
   require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
-  require 'kickstart.plugins.neo-tree',
+  -- require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
