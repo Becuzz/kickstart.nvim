@@ -194,6 +194,20 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
+vim.keymap.set({ 'v', 'n' }, '<leader>y', '"+y', { desc = 'Yank to clipboard' })
+vim.keymap.set({ 'v', 'n' }, '<leader>p', '"+p', { desc = 'Paste from clipboard' })
+vim.keymap.set({ 'v', 'n' }, '<leader>P', '"+P', { desc = 'Paste from clipboard' })
+
+vim.keymap.set('x', '<C-p>', '"_dP', { desc = 'Paste and keep' })
+
+vim.keymap.set('v', 'J', ":m '>+1<CR>gv=gv", { desc = 'Move block down' })
+vim.keymap.set('v', 'K', ":m '<-2<CR>gv=gv", { desc = 'Move block up' })
+
+vim.keymap.set('n', 'ge', '<cmd>cnext<CR>zz', { desc = '' })
+vim.keymap.set('n', 'gp', '<cmd>cprev<CR>zz', { desc = '' })
+vim.keymap.set('n', 'gj', '<cmd>lnext<CR>zz', { desc = '' })
+vim.keymap.set('n', 'gk', '<cmd>lprev<CR>zz', { desc = '' })
+
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
 -- vim.keymap.set("n", "<C-S-l>", "<C-w>L", { desc = "Move window to the right" })
@@ -330,7 +344,20 @@ require('lazy').setup({
   {
     'pmizio/typescript-tools.nvim',
     dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-    opts = {},
+    config = function()
+      require('typescript-tools').setup {
+        settings = {
+          tsserver_file_preferences = {
+            includeInlayParameterNameHints = 'all',
+            includeInlayFunctionParameterTypeHints = true,
+            includeInlayVariableTypeHints = true,
+            includeInlayPropertyDeclarationTypeHints = true,
+            includeInlayFunctionLikeReturnTypeHints = true,
+            includeInlayEnumMemberValueHints = true,
+          },
+        },
+      }
+    end,
   },
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -1000,8 +1027,39 @@ require('lazy').setup({
     'mfussenegger/nvim-dap',
   },
   {
+    'jay-babu/mason-nvim-dap.nvim',
+    opts = {
+      -- This line is essential to making automatic installation work
+      -- :exploding-brain
+      handlers = {},
+      automatic_installation = {
+        -- These will be configured by separate plugins.
+        exclude = {},
+      },
+      -- DAP servers: Mason will be invoked to install these if necessary.
+      ensure_installed = {
+        'js-debug-adapter',
+      },
+    },
+    dependencies = {
+      'mfussenegger/nvim-dap',
+      'williamboman/mason.nvim',
+    },
+  },
+  {
+    'theHamsta/nvim-dap-virtual-text',
+    config = true,
+    dependencies = {
+      'mfussenegger/nvim-dap',
+    },
+  },
+  {
     'rcarriga/nvim-dap-ui',
-    dependencies = { 'mfussenegger/nvim-dap', 'nvim-neotest/nvim-nio' },
+    dependencies = {
+      'jay-babu/mason-nvim-dap.nvim',
+      'nvim-neotest/nvim-nio',
+      'theHamsta/nvim-dap-virtual-text',
+    },
     config = function()
       local dap = require 'dap'
       local utils = require 'dap.utils'
@@ -1163,6 +1221,13 @@ require('lazy').setup({
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
+  -- {
+  --   'marcos-brasil/fix-ts-var-hints.nvim',
+  --   dependencies = { 'nvim-lua/plenary.nvim' },
+  --   config = function()
+  --     require('ts_inlay_hints').setup()
+  --   end,
+  -- },
   {
     'ThePrimeagen/harpoon',
     branch = 'harpoon2',
@@ -1232,6 +1297,7 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
+  { 'nvim-treesitter/nvim-treesitter-context', dependencies = { 'nvim-treesitter/nvim-treesitter' } },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
