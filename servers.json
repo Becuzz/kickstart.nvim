@@ -3,5 +3,6 @@
     "lua-language-server",
     "stylua",
     "eslint_d",
-    "prettierd"
+    "prettierd",
+    "typescript-language-server"
 ]
