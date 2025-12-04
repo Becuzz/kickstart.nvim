@@ -367,36 +367,7 @@ require('lazy').setup({
   -- options to `gitsigns.nvim`.
   --
   -- See `:help gitsigns` to understand what the configuration keys do
-  { -- Adds git related signs to the gutter, as well as utilities for managing changes
-    'lewis6991/gitsigns.nvim',
-    opts = {
-      signs = {
-        add = { text = '+' },
-        change = { text = '~' },
-        delete = { text = '_' },
-        topdelete = { text = '‾' },
-        changedelete = { text = '~' },
-      },
-    },
-  },
-  -- {
-  --   'pmizio/typescript-tools.nvim',
-  --   dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-  --   config = function()
-  --     require('typescript-tools').setup {
-  --       settings = {
-  --         tsserver_file_preferences = {
-  --           includeInlayParameterNameHints = 'all',
-  --           includeInlayFunctionParameterTypeHints = true,
-  --           includeInlayVariableTypeHints = true,
-  --           includeInlayPropertyDeclarationTypeHints = true,
-  --           includeInlayFunctionLikeReturnTypeHints = true,
-  --           includeInlayEnumMemberValueHints = true,
-  --         },
-  --       },
-  --     }
-  --   end,
-  -- },
+
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
   -- This is often very useful to both group configuration, as well as handle
@@ -918,36 +889,6 @@ require('lazy').setup({
   },
 
   {
-    'mfussenegger/nvim-lint',
-    event = {
-      'BufReadPre',
-      'BufNewFile',
-    },
-    config = function()
-      local lint = require 'lint'
-
-      lint.linters_by_ft = {
-        javascript = { 'eslint_d' },
-        typescript = { 'eslint_d' },
-        javascriptreact = { 'eslint_d' },
-        typescriptreact = { 'eslint_d' },
-      }
-
-      local lint_augroup = vim.api.nvim_create_augroup('lint', { clear = true })
-
-      vim.api.nvim_create_autocmd({ 'BufEnter', 'BufWritePost', 'InsertLeave' }, {
-        group = lint_augroup,
-        callback = function()
-          lint.try_lint()
-        end,
-      })
-      vim.keymap.set('n', '<leader>l', function()
-        lint.try_lint()
-      end, { desc = 'Trigger [l]inting for current file' })
-    end,
-  },
-
-  {
     'zbirenbaum/neodim',
     event = 'LspAttach',
     config = function()
@@ -1068,30 +1009,6 @@ require('lazy').setup({
     },
   },
 
-  -- Debugging
-  -- {
-  --   'mfussenegger/nvim-dap',
-  -- },
-  -- {
-  --   'jay-babu/mason-nvim-dap.nvim',
-  --   opts = {
-  --     -- This line is essential to making automatic installation work
-  --     -- :exploding-brain
-  --     handlers = {},
-  --     automatic_installation = {
-  --       -- These will be configured by separate plugins.
-  --       exclude = {},
-  --     },
-  --     -- DAP servers: Mason will be invoked to install these if necessary.
-  --     ensure_installed = {
-  --       'js-debug-adapter',
-  --     },
-  --   },
-  --   dependencies = {
-  --     'mfussenegger/nvim-dap',
-  --     'williamboman/mason.nvim',
-  --   },
-  -- },
   {
     'theHamsta/nvim-dap-virtual-text',
     config = true,
@@ -1099,104 +1016,6 @@ require('lazy').setup({
       'mfussenegger/nvim-dap',
     },
   },
-  -- {
-  --   'rcarriga/nvim-dap-ui',
-  --   dependencies = {
-  --     'jay-babu/mason-nvim-dap.nvim',
-  --     'nvim-neotest/nvim-nio',
-  --     'theHamsta/nvim-dap-virtual-text',
-  --   },
-  --   config = function()
-  --     local dap = require 'dap'
-  --     local utils = require 'dap.utils'
-  --     local dapui = require 'dapui'
-  --     dap.adapters = {
-  --       ['pwa-node'] = {
-  --         type = 'server',
-  --         port = '${port}',
-  --         executable = {
-  --           command = 'js-debug-adapter',
-  --           args = {
-  --             '${port}',
-  --           },
-  --         },
-  --       },
-  --     }
-  --
-  --     dap.configurations['typescript'] = {
-  --       {
-  --         type = 'pwa-node',
-  --         request = 'launch',
-  --         name = 'Launch file',
-  --         program = '${file}',
-  --         cwd = '${workspaceFolder}',
-  --       },
-  --       {
-  --         type = 'pwa-node',
-  --         request = 'attach',
-  --         name = 'Attach to process ID',
-  --         processId = utils.pick_process,
-  --         cwd = '${workspaceFolder}',
-  --       },
-  --     }
-  --     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
-  --     dap.listeners.before.event_terminated['dapui_config'] = dapui.close
-  --     dap.listeners.before.event_exited['dapui_config'] = dapui.close
-  --
-  --     local map = function(keys, func, desc)
-  --       if desc then
-  --         desc = '[D]ebugger: ' .. desc
-  --       end
-  --       if keys then
-  --         keys = '<leader>d' .. keys
-  --       end
-  --       vim.keymap.set('n', keys, func, { desc = desc })
-  --     end
-  --
-  --     map('c', dap.continue, '[C]ontinue')
-  --     -- TODO: is this really needed?
-  --     -- map("a", function()
-  --     --   require("dap").continue({ before = get_args })
-  --     -- end, "Run with [A]rgs")
-  --     map('i', dap.step_into, 'Step [I]nto')
-  --     map('O', dap.step_out, 'Step [O]ut')
-  --     map('o', dap.step_over, 'Step Over')
-  --     map('C', function()
-  --       require('dap').run_to_cursor()
-  --     end, 'Run to [C]ursor')
-  --     map('g', function()
-  --       require('dap').goto_()
-  --     end, '[G]o to line (no execute)')
-  --     map('b', dap.toggle_breakpoint, 'Toggle [B]reakpoint')
-  --     map('B', function()
-  --       dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
-  --     end, 'Set [B]reakpoint')
-  --     map('j', dap.down, 'Down')
-  --     map('k', dap.up, 'Up')
-  --     map('l', dap.run_last, 'Run [L]ast')
-  --     map('p', dap.pause, 'Pause')
-  --     map('r', function()
-  --       dap.repl.toggle()
-  --     end, 'Toggle REPL')
-  --     map('s', dap.session, 'Session')
-  --     map('t', dap.terminate, 'Terminate')
-  --     map('w', function()
-  --       require('dap.ui.widgets').hover()
-  --     end, 'Widgets')
-  --
-  --     map('u', function()
-  --       dapui.toggle {
-  --         -- Always open the nvim dap ui in the default sizes
-  --         reset = true,
-  --       }
-  --     end, 'Toggle [U]I')
-  --     map('e', function()
-  --       dapui.eval()
-  --     end, 'Eval')
-  --
-  --     vim.api.nvim_set_keymap('n', '<F5>', [[:lua require"osv".launch({port = 8086})<CR>]], { noremap = true })
-  --   end,
-  -- },
 
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
@@ -1267,13 +1086,7 @@ require('lazy').setup({
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
-  -- {
-  --   'marcos-brasil/fix-ts-var-hints.nvim',
-  --   dependencies = { 'nvim-lua/plenary.nvim' },
-  --   config = function()
-  --     require('ts_inlay_hints').setup()
-  --   end,
-  -- },
+
   {
     'ThePrimeagen/harpoon',
     branch = 'harpoon2',
@@ -1391,26 +1204,6 @@ require('lazy').setup({
       instructions_file = 'avante.md',
       -- for example
       provider = 'claude-code',
-      providers = {
-        claude = {
-          endpoint = 'https://api.anthropic.com',
-          model = 'claude-sonnet-4-20250514',
-          timeout = 30000, -- Timeout in milliseconds
-          extra_request_body = {
-            temperature = 0.75,
-            max_tokens = 20480,
-          },
-        },
-        -- moonshot = {
-        --   endpoint = 'https://api.moonshot.ai/v1',
-        --   model = 'kimi-k2-0711-preview',
-        --   timeout = 30000, -- Timeout in milliseconds
-        --   extra_request_body = {
-        --     temperature = 0.75,
-        --     max_tokens = 32768,
-        --   },
-        -- },
-      },
     },
     dependencies = {
       'nvim-lua/plenary.nvim',
@@ -1501,3 +1294,4 @@ require('lazy').setup({
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+
